@@ -97,13 +97,16 @@ class GameRoom {
         if (!player) return;
         
         const paddle = this.gameState.paddles[player.playerNumber];
-        const speed = 5;
+        const speed = 7; // Increased speed for responsiveness
         
         if (direction === 'up') {
             paddle.y = Math.max(0, paddle.y - speed);
         } else if (direction === 'down') {
-            paddle.y = Math.min(300, paddle.y + speed); // 400 - 100 (paddle height)
+            paddle.y = Math.min(300, paddle.y + speed);
         }
+        
+        // Mark that this paddle was updated
+        paddle.lastUpdate = Date.now();
     }
 
     updateBall() {
@@ -273,30 +276,64 @@ io.on('connection', (socket) => {
             room.startGame();
             io.to(roomId).emit('game_started');
             
-            // Start game loop for this room
+            // Optimized game loop for this room
+            let lastBallUpdate = Date.now();
             const gameInterval = setInterval(() => {
                 if (!gameRooms.has(roomId) || room.isEmpty()) {
                     clearInterval(gameInterval);
                     return;
                 }
                 
-                const scoreEvent = room.updateBall();
-                io.to(roomId).emit('game_update', room.gameState);
+                const now = Date.now();
                 
-                if (scoreEvent) {
-                    io.to(roomId).emit('score_update', room.gameState.scores);
+                // Update ball less frequently for better performance
+                if (now - lastBallUpdate >= 16) { // ~60 FPS for ball
+                    const scoreEvent = room.updateBall();
+                    lastBallUpdate = now;
+                    
+                    if (scoreEvent) {
+                        io.to(roomId).emit('score_update', room.gameState.scores);
+                    }
                 }
-            }, 1000 / 60); // 60 FPS
+                
+                // Send game state updates
+                io.to(roomId).emit('game_update', {
+                    ball: room.gameState.ball,
+                    paddles: room.gameState.paddles,
+                    timestamp: now
+                });
+                
+            }, 16); // ~60 FPS
         }
     });
     
-    // Handle player input
+    // Handle player input with throttling
+    let inputCooldowns = new Map();
+    
     socket.on('player_input', (data) => {
         const { roomId, direction } = data;
         const room = gameRooms.get(roomId);
         
         if (room) {
-            room.updatePaddle(socket.id, direction);
+            // Throttle input to prevent spam
+            const now = Date.now();
+            const lastInput = inputCooldowns.get(socket.id) || 0;
+            
+            if (now - lastInput >= 10) { // 100 updates per second max
+                room.updatePaddle(socket.id, direction);
+                inputCooldowns.set(socket.id, now);
+                
+                // Immediately broadcast paddle update for responsiveness
+                const player = room.players[socket.id];
+                if (player) {
+                    const paddleUpdate = {
+                        playerNumber: player.playerNumber,
+                        y: room.gameState.paddles[player.playerNumber].y,
+                        timestamp: now
+                    };
+                    io.to(roomId).emit('paddle_update', paddleUpdate);
+                }
+            }
         }
     });
     

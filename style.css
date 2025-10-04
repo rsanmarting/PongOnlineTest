@@ -26,9 +26,17 @@ body {
 
 .title {
     font-size: 4rem;
-    margin-bottom: 30px;
+    margin-bottom: 10px;
     text-shadow: 0 0 20px #ffffff;
     letter-spacing: 10px;
+}
+
+.version-info {
+    font-size: 0.9rem;
+    opacity: 0.7;
+    margin-bottom: 20px;
+    color: #20c997;
+    font-style: italic;
 }
 
 .menu-options {

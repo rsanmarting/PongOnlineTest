@@ -16,6 +16,12 @@ let playerName = '';
 let isOnlineMode = false;
 let onlineGameState = null;
 
+// Client-side prediction variables
+let localPaddleY = 0;
+let lastServerUpdate = 0;
+let inputBuffer = [];
+let interpolationDelay = 100; // ms
+
 // Game objects
 class Paddle {
     constructor(x, y, width, height) {
@@ -403,6 +409,28 @@ function initializeSocket() {
     
     socket.on('game_update', (gameState) => {
         onlineGameState = gameState;
+        lastServerUpdate = Date.now();
+        
+        // Update local paddle position from server occasionally
+        if (playerNumber && gameState.paddles && gameState.paddles[playerNumber]) {
+            const serverPaddleY = gameState.paddles[playerNumber].y;
+            const diff = Math.abs(localPaddleY - serverPaddleY);
+            
+            // If difference is significant, correct it smoothly
+            if (diff > 20) {
+                localPaddleY = serverPaddleY;
+            }
+        }
+    });
+    
+    socket.on('paddle_update', (paddleData) => {
+        // Immediate paddle updates for better responsiveness
+        if (onlineGameState && onlineGameState.paddles) {
+            if (paddleData.playerNumber !== playerNumber) {
+                // Update other player's paddle immediately
+                onlineGameState.paddles[paddleData.playerNumber].y = paddleData.y;
+            }
+        }
     });
     
     socket.on('score_update', (scores) => {
@@ -461,24 +489,67 @@ function onlineGameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
     if (onlineGameState) {
-        // Draw game state from server
+        // Draw game state from server with client-side prediction
         drawCenterLine();
         
-        // Draw paddles
+        // Draw paddles with prediction for local player
         ctx.fillStyle = '#ffffff';
         const p1 = onlineGameState.paddles.player1;
         const p2 = onlineGameState.paddles.player2;
-        ctx.fillRect(p1.x, p1.y, p1.width, p1.height);
-        ctx.fillRect(p2.x, p2.y, p2.width, p2.height);
         
-        // Draw ball
+        // Use predicted position for local player
+        if (playerNumber === 'player1') {
+            ctx.fillRect(p1.x, localPaddleY || p1.y, p1.width, p1.height);
+            ctx.fillRect(p2.x, p2.y, p2.width, p2.height);
+        } else {
+            ctx.fillRect(p1.x, p1.y, p1.width, p1.height);
+            ctx.fillRect(p2.x, localPaddleY || p2.y, p2.width, p2.height);
+        }
+        
+        // Draw ball with interpolation
         const ball = onlineGameState.ball;
         ctx.beginPath();
         ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
         ctx.fill();
+        
+        // Update local prediction
+        updateLocalPrediction();
     }
     
     animationId = requestAnimationFrame(onlineGameLoop);
+}
+
+// Client-side prediction for smoother movement
+function updateLocalPrediction() {
+    if (!onlineGameState || !playerNumber) return;
+    
+    const myPaddle = onlineGameState.paddles[playerNumber];
+    if (!myPaddle) return;
+    
+    // Initialize local position if not set
+    if (localPaddleY === 0) {
+        localPaddleY = myPaddle.y;
+    }
+    
+    // Apply local input prediction
+    const speed = 5;
+    if (keys['w']) {
+        localPaddleY = Math.max(0, localPaddleY - speed);
+    } else if (keys['s']) {
+        localPaddleY = Math.min(300, localPaddleY + speed);
+    }
+    
+    // Reconcile with server position periodically
+    const now = Date.now();
+    if (now - lastServerUpdate > 200) { // Every 200ms
+        const serverY = myPaddle.y;
+        const diff = Math.abs(localPaddleY - serverY);
+        
+        // If difference is too large, smoothly correct
+        if (diff > 10) {
+            localPaddleY += (serverY - localPaddleY) * 0.1;
+        }
+    }
 }
 
 // Handle online input
@@ -487,13 +558,9 @@ function handleOnlineInput() {
     
     let direction = null;
     
-    if (playerNumber === 'player1') {
-        if (keys['w']) direction = 'up';
-        else if (keys['s']) direction = 'down';
-    } else if (playerNumber === 'player2') {
-        if (keys['arrowup']) direction = 'up';
-        else if (keys['arrowdown']) direction = 'down';
-    }
+    // Both players use WASD in online mode
+    if (keys['w']) direction = 'up';
+    else if (keys['s']) direction = 'down';
     
     if (direction) {
         socket.emit('player_input', { roomId: currentRoom, direction: direction });
