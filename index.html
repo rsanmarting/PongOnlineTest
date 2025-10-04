@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pong Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="menu" class="menu">
+        <h1 class="title">PONG</h1>
+        <div class="menu-options">
+            <button id="player-vs-cpu" class="menu-button">Jugador vs CPU</button>
+            <button id="player-vs-player" class="menu-button">Jugador vs Jugador</button>
+            <button id="online-mode" class="menu-button online-button">Modo Online</button>
+        </div>
+        <div class="controls-info">
+            <p>Jugador 1: WASD</p>
+            <p>Jugador 2: ↑ ↓ ← →</p>
+        </div>
+    </div>
+
+    <!-- Online Menu -->
+    <div id="online-menu" class="menu hidden">
+        <h1 class="title">MODO ONLINE</h1>
+        <div class="online-options">
+            <div class="player-name-section">
+                <input type="text" id="player-name" class="name-input" placeholder="Tu nombre" maxlength="15">
+            </div>
+            <button id="create-room-btn" class="menu-button">Crear Sala</button>
+            <button id="join-room-btn" class="menu-button">Unirse a Sala</button>
+            <button id="back-to-menu" class="menu-button secondary">Volver</button>
+        </div>
+        <div class="connection-status" id="connection-status">
+            <span class="status-indicator" id="status-indicator"></span>
+            <span id="status-text">Conectando...</span>
+        </div>
+    </div>
+
+    <!-- Room Creation -->
+    <div id="room-creation" class="menu hidden">
+        <h2>Crear Sala</h2>
+        <div class="room-info">
+            <p>Código de Sala: <span id="room-code" class="room-code">------</span></p>
+            <p>Esperando jugador...</p>
+        </div>
+        <div class="waiting-animation">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+        </div>
+        <button id="cancel-room" class="menu-button secondary">Cancelar</button>
+    </div>
+
+    <!-- Join Room -->
+    <div id="join-room-menu" class="menu hidden">
+        <h2>Unirse a Sala</h2>
+        <div class="join-options">
+            <input type="text" id="room-code-input" class="name-input" placeholder="Código de sala" maxlength="6">
+            <button id="join-room-confirm" class="menu-button">Unirse</button>
+            <div class="available-rooms" id="available-rooms">
+                <h3>Salas Disponibles:</h3>
+                <div id="rooms-list" class="rooms-list"></div>
+            </div>
+        </div>
+        <button id="back-to-online" class="menu-button secondary">Volver</button>
+    </div>
+
+    <div id="game-container" class="game-container hidden">
+        <div class="scoreboard">
+            <div class="score">
+                <span id="player1-score">0</span>
+                <span class="score-separator">-</span>
+                <span id="player2-score">0</span>
+            </div>
+            <div class="game-mode" id="game-mode">Jugador vs CPU</div>
+        </div>
+        
+        <canvas id="gameCanvas" width="800" height="400"></canvas>
+        
+        <div class="game-controls">
+            <button id="pause-btn" class="control-button">Pausar</button>
+            <button id="restart-btn" class="control-button">Reiniciar</button>
+            <button id="menu-btn" class="control-button">Menú</button>
+        </div>
+    </div>
+
+    <div id="pause-overlay" class="pause-overlay hidden">
+        <h2>PAUSA</h2>
+        <p>Presiona ESPACIO para continuar</p>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
